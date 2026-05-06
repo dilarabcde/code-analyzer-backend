@@ -41,6 +41,9 @@ def analyze_code(code: str):
         risk_score = 0
         max_depth = 0
 
+        secret_keywords = ["password", "api_key", "apikey", "secret", "token", "access_key"]
+        hardcoded_secrets = []
+
         risky_imports = {
             "os": 2,
             "subprocess": 4,
@@ -81,6 +84,19 @@ def analyze_code(code: str):
 
             elif isinstance(node, ast.If):
                 if_count += 1
+
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        variable_name = target.id.lower()
+
+                        if any(keyword in variable_name for keyword in secret_keywords):
+                            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                                hardcoded_secrets.append(target.id)
+                                risk_score += 4
+                                risk_warnings.append(
+                                    f"{target.id} değişkeninde hardcoded secret olabilir."
+                                )
 
             elif isinstance(node, ast.Import):
                 for alias in node.names:
@@ -166,8 +182,11 @@ def analyze_code(code: str):
 
         if not suggestions:
             suggestions.append("Kod genel olarak sade görünüyor; okunabilirliği koruyarak geliştirmeye devam edilebilir.")
-
+        if hardcoded_secrets:
+            suggestions.append("Şifre, token veya API key gibi gizli bilgiler kod içinde tutulmamalı; environment variable kullanılmalıdır.")
+        
         summary = ""
+        
 
         if risk_level == "high":
             summary += "Kod yüksek güvenlik riski içermektedir. "
@@ -204,6 +223,7 @@ def analyze_code(code: str):
                 "risk_level": risk_level,
                 "imports": imports,
                 "dangerous_calls": dangerous_calls,
+                "hardcoded_secrets": hardcoded_secrets,
                 "warnings": risk_warnings
             },
             "explanation": explanation,
