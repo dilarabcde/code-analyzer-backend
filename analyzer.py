@@ -180,13 +180,13 @@ def analyze_code(code: str):
         if line_count > 100:
             suggestions.append("Kod dosyası uzun görünüyor; modüllere ayırmak okunabilirliği artırabilir.")
 
-        if not suggestions:
-            suggestions.append("Kod genel olarak sade görünüyor; okunabilirliği koruyarak geliştirmeye devam edilebilir.")
         if hardcoded_secrets:
             suggestions.append("Şifre, token veya API key gibi gizli bilgiler kod içinde tutulmamalı; environment variable kullanılmalıdır.")
-        
+
+        if not suggestions:
+            suggestions.append("Kod genel olarak sade görünüyor; okunabilirliği koruyarak geliştirmeye devam edilebilir.")
+
         summary = ""
-        
 
         if risk_level == "high":
             summary += "Kod yüksek güvenlik riski içermektedir. "
@@ -203,6 +203,28 @@ def analyze_code(code: str):
             summary += "Kod orta seviyede karmaşıklığa sahiptir."
         else:
             summary += "Kod basit ve anlaşılır yapıdadır."
+
+        agent_recommendation = ""
+
+        if risk_level == "high":
+            agent_recommendation += "Öncelik güvenlik risklerini azaltmak olmalı. "
+        elif risk_level == "medium":
+            agent_recommendation += "Kod orta seviyede güvenlik riski içeriyor; riskli noktalar gözden geçirilmeli. "
+        else:
+            agent_recommendation += "Kod güvenlik açısından düşük riskli görünüyor. "
+
+        if complexity_level == "high":
+            agent_recommendation += "Kod karmaşıklığı yüksek olduğu için fonksiyonlara bölünmesi önerilir. "
+        elif complexity_level == "medium":
+            agent_recommendation += "Kod orta seviyede karmaşıklığa sahip; okunabilirlik iyileştirilebilir. "
+        else:
+            agent_recommendation += "Kod karmaşıklığı düşük ve okunabilir görünüyor. "
+
+        if hardcoded_secrets:
+            agent_recommendation += "Gizli bilgiler kod içinden çıkarılıp environment variable olarak yönetilmelidir. "
+
+        if dangerous_calls:
+            agent_recommendation += "Riskli fonksiyon çağrıları güvenli alternatiflerle değiştirilmelidir. "
 
         return {
             "status": "success",
@@ -228,6 +250,7 @@ def analyze_code(code: str):
             },
             "explanation": explanation,
             "summary": summary,
+            "agent_recommendation": agent_recommendation,
             "suggestions": suggestions
         }
 

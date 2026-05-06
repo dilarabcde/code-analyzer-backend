@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from analyzer import analyze_code
 from fastapi.middleware.cors import CORSMiddleware
+import time
 
 app = FastAPI()
 app.add_middleware(
@@ -31,4 +32,5 @@ def health_check():
 @app.post("/analyze")
 def analyze(request: CodeRequest):
     print(f"Analyze endpoint çağrıldı | Kod uzunluğu: {len(request.code)} karakter")
+    time.sleep(2)
     return analyze_code(request.code)
