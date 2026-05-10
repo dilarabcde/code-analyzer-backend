@@ -19,6 +19,106 @@ def get_complexity_level(score: int) -> str:
     return "high"
 
 
+def get_syntax_suggestion(error, code: str) -> str:
+    error_text = str(error).lower()
+    line_text = ""
+
+    try:
+        lines = code.splitlines()
+        if error.lineno and error.lineno <= len(lines):
+            line_text = lines[error.lineno - 1].strip()
+    except Exception:
+        pass
+
+    if (
+        "expected ':'" in error_text
+        or (
+            line_text.startswith(("def ", "if ", "elif ", "else", "for ", "while ", "class "))
+            and not line_text.endswith(":")
+        )
+    ):
+        return "Satır sonunda ':' eksik olabilir."
+
+    if (
+        "unterminated string literal" in error_text
+        or line_text.count('"') % 2 != 0
+        or line_text.count("'") % 2 != 0
+    ):
+        return "Tırnak işareti eksik veya kapatılmamış olabilir."
+
+    if (
+        "was never closed" in error_text
+        or line_text.count("(") > line_text.count(")")
+        or line_text.count("[") > line_text.count("]")
+        or line_text.count("{") > line_text.count("}")
+    ):
+        return "Parantez veya köşeli parantez kapatılmamış olabilir."
+
+    if "unexpected indent" in error_text:
+        return "Girintileme hatası var."
+
+    if "invalid syntax" in error_text and "except" in line_text:
+        return "'except' bloğu öncesinde 'try:' bloğu eksik olabilir."
+
+    if "invalid syntax" in error_text:
+        return "Python söz dizimi hatası mevcut."
+
+    return "Kodunu kontrol et."
+
+
+def detect_possible_missing_commas(code: str):
+    suggestions = []
+    lines = code.splitlines()
+
+    for i in range(len(lines) - 1):
+        current = lines[i].strip()
+        next_line = lines[i + 1].strip()
+
+        if (
+            current.startswith(("'", '"'))
+            and current.endswith(("'", '"'))
+            and not current.endswith(",")
+            and next_line.startswith(("'", '"'))
+        ):
+            suggestions.append(f"{i + 1}. satırdan sonra virgül eksik olabilir.")
+
+    return suggestions
+
+
+def fix_code(code: str):
+    lines = code.splitlines()
+    fixed_lines = lines.copy()
+    fixes = []
+
+    for index, line in enumerate(fixed_lines):
+        stripped = line.strip()
+
+        if (
+            stripped.startswith(("def ", "if ", "elif ", "else", "for ", "while ", "class "))
+            and not stripped.endswith(":")
+        ):
+            fixed_lines[index] = line + ":"
+            fixes.append(f"{index + 1}. satıra ':' eklendi.")
+
+        if stripped.count('"') % 2 != 0:
+            fixed_lines[index] = fixed_lines[index] + '"'
+            fixes.append(f"{index + 1}. satırda eksik çift tırnak tamamlandı.")
+
+        if stripped.count("'") % 2 != 0:
+            fixed_lines[index] = fixed_lines[index] + "'"
+            fixes.append(f"{index + 1}. satırda eksik tek tırnak tamamlandı.")
+
+        if stripped.count("(") > stripped.count(")"):
+            fixed_lines[index] = fixed_lines[index] + ")"
+            fixes.append(f"{index + 1}. satırda eksik parantez tamamlandı.")
+
+    return {
+        "status": "success",
+        "fixed_code": "\n".join(fixed_lines),
+        "fixes": fixes if fixes else ["Otomatik düzeltilecek basit bir hata bulunamadı."]
+    }
+
+
 def analyze_code(code: str):
     if not code.strip():
         return {
@@ -69,6 +169,9 @@ def analyze_code(code: str):
 
         calculate_depth(tree)
 
+        comma_suggestions = detect_possible_missing_commas(code)
+        suggestions.extend(comma_suggestions)
+
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 functions.append(node.name)
@@ -84,6 +187,20 @@ def analyze_code(code: str):
 
             elif isinstance(node, ast.If):
                 if_count += 1
+
+            elif isinstance(node, ast.AnnAssign):
+                annotation = node.annotation
+
+                if isinstance(annotation, ast.Name):
+                    known_types = {
+                        "str", "int", "float", "bool",
+                        "list", "dict", "tuple", "set"
+                    }
+
+                    if annotation.id not in known_types:
+                        suggestions.append(
+                            f"'{annotation.id}' tanımsız bir tip olabilir. 'str' yazmak istemiş olabilirsin."
+                        )
 
             elif isinstance(node, ast.Assign):
                 for target in node.targets:
@@ -204,28 +321,6 @@ def analyze_code(code: str):
         else:
             summary += "Kod basit ve anlaşılır yapıdadır."
 
-        agent_recommendation = ""
-
-        if risk_level == "high":
-            agent_recommendation += "Öncelik güvenlik risklerini azaltmak olmalı. "
-        elif risk_level == "medium":
-            agent_recommendation += "Kod orta seviyede güvenlik riski içeriyor; riskli noktalar gözden geçirilmeli. "
-        else:
-            agent_recommendation += "Kod güvenlik açısından düşük riskli görünüyor. "
-
-        if complexity_level == "high":
-            agent_recommendation += "Kod karmaşıklığı yüksek olduğu için fonksiyonlara bölünmesi önerilir. "
-        elif complexity_level == "medium":
-            agent_recommendation += "Kod orta seviyede karmaşıklığa sahip; okunabilirlik iyileştirilebilir. "
-        else:
-            agent_recommendation += "Kod karmaşıklığı düşük ve okunabilir görünüyor. "
-
-        if hardcoded_secrets:
-            agent_recommendation += "Gizli bilgiler kod içinden çıkarılıp environment variable olarak yönetilmelidir. "
-
-        if dangerous_calls:
-            agent_recommendation += "Riskli fonksiyon çağrıları güvenli alternatiflerle değiştirilmelidir. "
-
         return {
             "status": "success",
             "analysis": {
@@ -250,7 +345,6 @@ def analyze_code(code: str):
             },
             "explanation": explanation,
             "summary": summary,
-            "agent_recommendation": agent_recommendation,
             "suggestions": suggestions
         }
 
@@ -259,5 +353,7 @@ def analyze_code(code: str):
             "status": "error",
             "message": "Kodda syntax hatası var.",
             "detail": str(e),
-            "suggestion": "Parantezleri, girintileri ve eksik ':' karakterlerini kontrol et."
+            "error_line": e.lineno or 1,
+            "error_offset": e.offset,
+            "suggestion": get_syntax_suggestion(e, code)
         }
