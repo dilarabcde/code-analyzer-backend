@@ -4,6 +4,8 @@ from agent import CodeAnalysisAgent
 from fastapi.middleware.cors import CORSMiddleware
 import time
 from analyzer import fix_code
+from fastapi import UploadFile, File
+from project_analyzer import analyze_project
 
 app = FastAPI()
 agent = CodeAnalysisAgent()
@@ -48,3 +50,27 @@ def analyze(request: CodeRequest):
 def fix(request: CodeRequest):
     print(f"Fix endpoint çağrıldı | Kod uzunluğu: {len(request.code)} karakter")
     return fix_code(request.code)
+
+@app.post("/analyze-project")
+async def analyze_project_files(files: list[UploadFile] = File(...)):
+    uploaded_files = []
+
+    for file in files:
+        if not file.filename.endswith(".py"):
+            continue
+
+        content = await file.read()
+        code = content.decode("utf-8", errors="ignore")
+
+        uploaded_files.append({
+            "filename": file.filename,
+            "content": code
+        })
+
+    if not uploaded_files:
+        return {
+            "status": "error",
+            "message": "Analiz edilecek Python dosyası bulunamadı."
+        }
+
+    return analyze_project(uploaded_files)
