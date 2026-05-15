@@ -1,40 +1,41 @@
 import requests
 
 
-def get_llm_analysis(code, static_result):
+def get_llm_analysis(code: str, analysis_result: dict):
     prompt = f"""
-Sen uzman bir AI Code Review Agent'sın.
+Sen kıdemli bir yazılım mühendisi gibi davran.
 
-Aşağıdaki Python kodunu analiz et.
+Aşağıdaki Python kodunu ve statik analiz sonucunu incele.
+Kullanıcıya Türkçe, kısa ama teknik bir açıklama üret.
 
-Kod:
-{code}
+Şunları açıkla:
+1. Kod genel olarak ne yapıyor?
+2. Riskli veya karmaşık yerler var mı?
+3. Geliştiriciye 3 iyileştirme önerisi ver.
 
-Statik analiz sonucu:
-{static_result}
+KOD:
+{code[:4000]}
 
-Kısa ve Türkçe cevap ver:
-1. Kod ne yapıyor?
-2. Güvenlik riski var mı?
-3. Nasıl iyileştirilebilir?
+STATİK ANALİZ:
+{analysis_result}
 """
 
     try:
         response = requests.post(
-            "http://localhost:11434/api/chat",
+            "http://localhost:11434/api/generate",
             json={
                 "model": "llama3.2",
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
+                "prompt": prompt,
                 "stream": False
             },
-            timeout=30
+            timeout=60
         )
 
-        response.raise_for_status()
+        if response.status_code != 200:
+            return "LLM servisi cevap veremedi. Ollama çalışıyor mu kontrol et."
+
         data = response.json()
-        return data["message"]["content"]
+        return data.get("response", "LLM analizi alınamadı.")
 
     except Exception as e:
-        return f"Lokal LLM analizi alınamadı: {str(e)}"
+        return f"LLM bağlantı hatası: {str(e)}"
