@@ -6,6 +6,7 @@ import time
 from analyzer import fix_code
 from fastapi import UploadFile, File
 from project_analyzer import analyze_project
+from multi_language_analyzer import analyze_cpp_code, analyze_javascript_code
 
 app = FastAPI()
 agent = CodeAnalysisAgent()
@@ -25,6 +26,7 @@ app.add_middleware(
 
 class CodeRequest(BaseModel):
     code: str
+    language: str = "python"
 
 
 @app.get("/")
@@ -42,13 +44,80 @@ def health_check():
 
 @app.post("/analyze")
 def analyze(request: CodeRequest):
+
     print(f"Analyze endpoint çağrıldı | Kod uzunluğu: {len(request.code)} karakter")
+
     time.sleep(2)
+
+    if request.language in ["cpp", "c++"]:
+        return analyze_cpp_code(request.code)
+
+    if request.language in ["javascript", "js"]:
+        return analyze_javascript_code(request.code)
+
     return agent.process(request.code)
 
 @app.post("/fix")
 def fix(request: CodeRequest):
-    print(f"Fix endpoint çağrıldı | Kod uzunluğu: {len(request.code)} karakter")
+
+    print(
+        f"Fix endpoint çağrıldı | Dil: {request.language} | Kod uzunluğu: {len(request.code)} karakter"
+    )
+
+    if request.language in ["cpp", "c++"]:
+
+        lines = request.code.splitlines()
+        fixed_lines = []
+
+        for line in lines:
+            stripped = line.strip()
+
+            if not stripped:
+                fixed_lines.append(line)
+                continue
+
+            if stripped.startswith("#") or stripped.startswith("//"):
+                fixed_lines.append(line)
+                continue
+
+            if (
+                stripped.endswith(";")
+                or stripped.endswith("{")
+                or stripped.endswith("}")
+                or stripped.endswith(":")
+            ):
+                fixed_lines.append(line)
+                continue
+
+            control_keywords = ("if", "for", "while", "switch", "else", "do")
+
+            if stripped.startswith(control_keywords):
+                fixed_lines.append(line)
+                continue
+
+            if stripped.startswith(("int main", "void main", "int ", "void ", "float ", "double ", "char ", "bool ")):
+                if "(" in stripped and ")" in stripped:
+                    fixed_lines.append(line)
+                    continue
+
+            fixed_lines.append(line + ";")
+
+        fixed_code = "\n".join(fixed_lines)
+
+        open_braces = fixed_code.count("{")
+        close_braces = fixed_code.count("}")
+
+        while close_braces < open_braces:
+            fixed_code += "\n}"
+            close_braces += 1
+
+        return {
+            "status": "fixed",
+            "language": "cpp",
+            "fixed_code": fixed_code,
+            "message": "C++ kodundaki eksik noktalı virgül ve süslü parantez hataları otomatik düzeltildi."
+        }
+
     return fix_code(request.code)
 
 @app.post("/analyze-project")
