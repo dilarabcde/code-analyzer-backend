@@ -7,6 +7,7 @@ from analyzer import fix_code
 from fastapi import UploadFile, File
 from project_analyzer import analyze_project
 from multi_language_analyzer import analyze_cpp_code, analyze_javascript_code
+from llm_service import get_llm_analysis
 
 app = FastAPI()
 agent = CodeAnalysisAgent()
@@ -50,12 +51,25 @@ def analyze(request: CodeRequest):
     time.sleep(2)
 
     if request.language in ["cpp", "c++"]:
-        return analyze_cpp_code(request.code)
+        result = analyze_cpp_code(request.code)
 
-    if request.language in ["javascript", "js"]:
-        return analyze_javascript_code(request.code)
+    elif request.language in ["javascript", "js"]:
+        result = analyze_javascript_code(request.code)
 
-    return agent.process(request.code)
+    else:
+        result = agent.process(request.code)
+
+    if result.get("status") == "success":
+        try:
+            result["llm_analysis"] = get_llm_analysis(
+                request.code,
+                result
+            )
+        except Exception as e:
+            print("LLM Error:", e)
+            result["llm_analysis"] = "LLM analizi şu anda çalışmıyor."
+
+    return result
 
 @app.post("/fix")
 def fix(request: CodeRequest):
