@@ -165,6 +165,8 @@ def analyze_cpp_code(code: str):
             "std::string, std::vector ve smart pointer kullanımı tercih edilebilir."
         ]
     }
+
+
 def analyze_javascript_code(code: str):
 
     if not code.strip():
@@ -201,6 +203,12 @@ def analyze_javascript_code(code: str):
     if open_braces != close_braces:
         syntax_error = "Süslü parantez sayıları eşleşmiyor."
 
+    open_parentheses = code.count("(")
+    close_parentheses = code.count(")")
+
+    if open_parentheses != close_parentheses:
+        syntax_error = "Parantez sayıları eşleşmiyor."
+
     return {
         "status": "error" if syntax_error else "success",
         "language": "javascript",
@@ -210,4 +218,162 @@ def analyze_javascript_code(code: str):
             "risks": risks
         },
         "summary": "JavaScript kodu analiz edildi."
+    }
+
+
+def analyze_java_code(code: str):
+    if not code.strip():
+        return {
+            "status": "error",
+            "message": "Kod alanı boş olamaz.",
+            "suggestion": "Lütfen analiz edilecek Java kodunu girin."
+        }
+
+    lines = code.splitlines()
+    risks = []
+
+    risk_patterns = {
+        "Runtime.getRuntime().exec": "Komut çalıştırma riski oluşturabilir.",
+        "System.exit": "Programı zorla sonlandırır, dikkatli kullanılmalıdır.",
+        "Statement": "SQL Injection riski olabilir.",
+        "password": "Hardcoded password riski olabilir."
+    }
+
+    for index, line in enumerate(lines, start=1):
+        for pattern, message in risk_patterns.items():
+            if pattern in line:
+                risks.append({
+                    "line": index,
+                    "pattern": pattern,
+                    "message": message
+                })
+
+    syntax_error = None
+
+    open_braces = code.count("{")
+    close_braces = code.count("}")
+
+    if open_braces != close_braces:
+        syntax_error = "Süslü parantez sayıları eşleşmiyor."
+
+    open_parentheses = code.count("(")
+    close_parentheses = code.count(")")
+
+    if open_parentheses != close_parentheses:
+        syntax_error = "Parantez sayıları eşleşmiyor."
+
+    loop_count = code.count("for") + code.count("while")
+    condition_count = code.count("if") + code.count("switch")
+    method_count = code.count("public ")
+
+    complexity_score = loop_count + condition_count + len(risks)
+
+    return {
+        "status": "error" if syntax_error else "success",
+        "language": "java",
+        "message": syntax_error if syntax_error else "Java kodu analiz edildi.",
+        "line_count": len(lines),
+        "function_count": method_count,
+        "security": {
+            "risk_level": "high" if len(risks) >= 3 else "medium" if risks else "safe",
+            "risks": risks
+        },
+        "analysis": {
+            "complexity": {
+                "score": complexity_score,
+                "level": "medium" if complexity_score >= 4 else "low"
+            }
+        },
+        "summary": f"Java kodu analiz edildi. {len(lines)} satır.",
+        "suggestions": [
+            "PreparedStatement kullanımı tercih edilebilir.",
+            "Hardcoded şifrelerden kaçının."
+        ]
+    }
+
+
+def analyze_go_code(code: str):
+    open_braces = code.count("{")
+    close_braces = code.count("}")
+
+    if open_braces != close_braces:
+        return {
+            "status": "error",
+            "message": "Go syntax hatası: Süslü parantezler eşleşmiyor.",
+            "security_score": "-",
+            "complexity_score": "-"
+        }
+
+    open_parentheses = code.count("(")
+    close_parentheses = code.count(")")
+
+    if open_parentheses != close_parentheses:
+        return {
+            "status": "error",
+            "message": "Go syntax hatası: Parantezler eşleşmiyor.",
+            "security_score": "-",
+            "complexity_score": "-"
+        }
+    if not code.strip():
+        return {
+            "status": "error",
+            "message": "Kod alanı boş olamaz.",
+            "suggestion": "Lütfen analiz edilecek Go kodunu girin."
+        }
+
+    lines = code.splitlines()
+    risks = []
+
+    risk_patterns = {
+        "exec.Command": "Sistem komutu çalıştırma riski oluşturabilir.",
+        "os.Remove": "Dosya silme işlemi dikkatli yönetilmelidir.",
+        "panic(": "panic kullanımı risklidir.",
+        "password": "Hardcoded password riski olabilir."
+    }
+
+    for index, line in enumerate(lines, start=1):
+        for pattern, message in risk_patterns.items():
+            if pattern in line:
+                risks.append({
+                    "line": index,
+                    "pattern": pattern,
+                    "message": message
+                })
+
+    syntax_error = None
+
+    open_braces = code.count("{")
+    close_braces = code.count("}")
+
+    if open_braces != close_braces:
+        syntax_error = "Süslü parantez sayıları eşleşmiyor."
+
+    open_parentheses = code.count("(")
+    close_parentheses = code.count(")")
+
+    if open_parentheses != close_parentheses:
+        syntax_error = "Parantez sayıları eşleşmiyor."
+
+    loop_count = code.count("for")
+    condition_count = code.count("if")
+    function_count = code.count("func ")
+
+    complexity_score = loop_count + condition_count + len(risks)
+
+    return {
+        "status": "error",
+        "language": "go",
+        "message": "Go syntax hatası: Parantezler eşleşmiyor.",
+        "error_line": 1,
+        "suggestion": "Eksik parantezleri kontrol edin.",
+        "security": {
+            "risk_level": "safe",
+            "risks": []
+        },
+        "analysis": {
+            "complexity": {
+                "score": 0,
+                "level": "low"
+            }
+        }
     }

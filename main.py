@@ -6,8 +6,9 @@ import time
 from analyzer import fix_code
 from fastapi import UploadFile, File
 from project_analyzer import analyze_project
-from multi_language_analyzer import analyze_cpp_code, analyze_javascript_code
 from llm_service import get_llm_analysis
+from multi_language_analyzer import (analyze_cpp_code,analyze_javascript_code,
+    analyze_java_code,analyze_go_code)
 
 app = FastAPI()
 agent = CodeAnalysisAgent()
@@ -42,24 +43,32 @@ def health_check():
         "message": "Code analyzer backend aktif çalışıyor."
     }
 
-
 @app.post("/analyze")
 def analyze(request: CodeRequest):
-
-    print(f"Analyze endpoint çağrıldı | Kod uzunluğu: {len(request.code)} karakter")
+    print(
+        f"Analyze endpoint çağrıldı | Dil: {request.language} | Kod uzunluğu: {len(request.code)} karakter"
+    )
 
     time.sleep(2)
 
-    if request.language in ["cpp", "c++"]:
+    language = request.language.lower()
+
+    if language in ["cpp", "c++"]:
         result = analyze_cpp_code(request.code)
 
-    elif request.language in ["javascript", "js"]:
+    elif language in ["javascript", "js"]:
         result = analyze_javascript_code(request.code)
+
+    elif language == "java":
+        result = analyze_java_code(request.code)
+
+    elif language == "go":
+        result = analyze_go_code(request.code)
 
     else:
         result = agent.process(request.code)
 
-    if result.get("status") == "success":
+    if result.get("status") == "success" and not result.get("llm_analysis"):
         try:
             result["llm_analysis"] = get_llm_analysis(
                 request.code,
@@ -70,7 +79,6 @@ def analyze(request: CodeRequest):
             result["llm_analysis"] = "LLM analizi şu anda çalışmıyor."
 
     return result
-
 @app.post("/fix")
 def fix(request: CodeRequest):
 
