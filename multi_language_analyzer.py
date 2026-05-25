@@ -1,7 +1,7 @@
 import re
 
 
-def check_cpp_syntax(code: str):
+def check_cpp_syntax(code: str): # c++ için basit syntax kontrolü
     if not code.strip():
         return {
             "has_error": True,
@@ -12,7 +12,7 @@ def check_cpp_syntax(code: str):
     open_braces = code.count("{")
     close_braces = code.count("}")
 
-    if open_braces != close_braces:
+    if open_braces != close_braces: # süslü parantezler eşleşmezse kod büyük ihtimalle eksik kapanmıştır
         return {
             "has_error": True,
             "error_line": 1,
@@ -29,7 +29,7 @@ def check_cpp_syntax(code: str):
             "message": "C++ syntax hatası: Parantez sayıları eşleşmiyor."
         }
 
-    if "main(" not in code:
+    if "main(" not in code: # main yoksa c++ programı çalışabilir kabul etmiyoruz
         return {
             "has_error": True,
             "error_line": 1,
@@ -38,13 +38,13 @@ def check_cpp_syntax(code: str):
 
     lines = code.splitlines()
 
-    for index, line in enumerate(lines, start=1):
+    for index, line in enumerate(lines, start=1): # satır satır gezip eksik ; olabilecek yerleri kontrol ediyoruz
         stripped = line.strip()
 
         if not stripped:
             continue
 
-        if stripped.startswith("#"):
+        if stripped.startswith("#"):  # include satırlarına dokunmuyoruz
             continue
 
         if stripped.endswith("{") or stripped.endswith("}") or stripped.endswith(":"):
@@ -53,7 +53,8 @@ def check_cpp_syntax(code: str):
         if stripped.startswith("//"):
             continue
 
-        control_keywords = ("if", "for", "while", "switch", "else", "do")
+        control_keywords = ("if", "for", "while", "switch", "else", "do") # if, for gibi yapılarda ; beklemiyoruz
+
 
         if stripped.startswith(control_keywords):
             continue
@@ -62,7 +63,7 @@ def check_cpp_syntax(code: str):
             continue
 
         if re.match(r"^(int|void|float|double|char|bool|string|auto)\s+\w+\s*\(.*\)$", stripped):
-            continue
+            continue # fonksiyon tanımıysa hata sayma
 
         return {
             "has_error": True,
@@ -77,7 +78,7 @@ def check_cpp_syntax(code: str):
     }
 
 
-def analyze_cpp_code(code: str):
+def analyze_cpp_code(code: str): # c++ kodunun güvenlik ve karmaşıklık analizi
     syntax_result = check_cpp_syntax(code)
 
     if syntax_result["has_error"]:
@@ -92,7 +93,8 @@ def analyze_cpp_code(code: str):
     lines = code.splitlines()
     line_count = len(lines)
 
-    risk_patterns = {
+    risk_patterns = { # riskli c++ kullanımlarını burda topluyoruz
+
         "system(": "system() kullanımı komut çalıştırma riski oluşturabilir.",
         "strcpy(": "strcpy() buffer overflow riski oluşturabilir.",
         "gets(": "gets() güvenli değildir, buffer overflow riski vardır.",
@@ -113,7 +115,7 @@ def analyze_cpp_code(code: str):
                     "pattern": pattern,
                     "message": message
                 })
-
+# regex ile fonksiyon tanımlarını yakalamaya çalışıyoruz
     function_matches = re.findall(
         r"\b(int|void|float|double|char|bool|string|auto)\s+\w+\s*\([^)]*\)\s*\{",
         code
@@ -124,7 +126,7 @@ def analyze_cpp_code(code: str):
     loop_count = len(re.findall(r"\b(for|while)\b", code))
     condition_count = len(re.findall(r"\b(if|switch)\b", code))
 
-    complexity_score = loop_count + condition_count + len(risks)
+    complexity_score = loop_count + condition_count + len(risks) # döngü, koşul ve risk sayısına göre basit karmaşıklık skoru
 
     if complexity_score >= 8:
         complexity_level = "high"
@@ -167,7 +169,7 @@ def analyze_cpp_code(code: str):
     }
 
 
-def analyze_javascript_code(code: str):
+def analyze_javascript_code(code: str): # javascript için temel risk kontrolü
 
     if not code.strip():
         return {
@@ -177,7 +179,7 @@ def analyze_javascript_code(code: str):
 
     risks = []
 
-    risk_patterns = {
+    risk_patterns = { # xss veya unsafe kullanım ihtimali olan kalıplar
         "eval(": "eval kullanımı güvenlik riski oluşturabilir.",
         "innerHTML": "innerHTML XSS riski oluşturabilir.",
         "document.write": "document.write güvenli değildir.",
@@ -200,7 +202,8 @@ def analyze_javascript_code(code: str):
     open_braces = code.count("{")
     close_braces = code.count("}")
 
-    if open_braces != close_braces:
+    if open_braces != close_braces: # javascriptte şimdilik basit parantez kontrolü yapıyoruz
+
         syntax_error = "Süslü parantez sayıları eşleşmiyor."
 
     open_parentheses = code.count("(")
@@ -221,7 +224,7 @@ def analyze_javascript_code(code: str):
     }
 
 
-def analyze_java_code(code: str):
+def analyze_java_code(code: str): # java kodu için temel güvenlik analizi
     if not code.strip():
         return {
             "status": "error",
@@ -232,7 +235,7 @@ def analyze_java_code(code: str):
     lines = code.splitlines()
     risks = []
 
-    risk_patterns = {
+    risk_patterns = { # sql injection ve hardcoded password gibi riskleri arıyoruz
         "Runtime.getRuntime().exec": "Komut çalıştırma riski oluşturabilir.",
         "System.exit": "Programı zorla sonlandırır, dikkatli kullanılmalıdır.",
         "Statement": "SQL Injection riski olabilir.",
@@ -266,7 +269,7 @@ def analyze_java_code(code: str):
     condition_count = code.count("if") + code.count("switch")
     method_count = code.count("public ")
 
-    complexity_score = loop_count + condition_count + len(risks)
+    complexity_score = loop_count + condition_count + len(risks) # java için yaklaşık complexity hesabı
 
     return {
         "status": "error" if syntax_error else "success",
@@ -292,7 +295,7 @@ def analyze_java_code(code: str):
     }
 
 
-def analyze_go_code(code: str):
+def analyze_go_code(code: str): # go kodu için temel analiz
     open_braces = code.count("{")
     close_braces = code.count("}")
 

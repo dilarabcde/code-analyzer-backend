@@ -2,6 +2,7 @@ import ast
 
 
 def get_risk_level(score: int) -> str:
+    # risk skorunu daha okunabilir seviyelere çeviriyoruz
     if score == 0:
         return "safe"
     elif score <= 4:
@@ -20,12 +21,14 @@ def get_complexity_level(score: int) -> str:
 
 
 def get_syntax_suggestion(error, code: str) -> str:
+    # syntax hatasına göre kullanıcıya daha açıklayıcı öneri üret
     error_text = str(error).lower()
     line_text = ""
 
     try:
-        lines = code.splitlines()
-        if error.lineno and error.lineno <= len(lines):
+        lines = code.splitlines() # hatanın olduğu satırı almaya çalışıyoruz
+        if error.lineno and error.lineno <= len(lines): # eksik : hatalarını yakalamaya çalış
+
             line_text = lines[error.lineno - 1].strip()
     except Exception:
         pass
@@ -66,7 +69,7 @@ def get_syntax_suggestion(error, code: str) -> str:
     return "Kodunu kontrol et."
 
 
-def detect_possible_missing_commas(code: str):
+def detect_possible_missing_commas(code: str): # liste içinde unutulmuş virgülleri tahmin etmeye çalışıyor
     suggestions = []
     lines = code.splitlines()
 
@@ -85,7 +88,7 @@ def detect_possible_missing_commas(code: str):
     return suggestions
 
 
-def fix_code(code: str):
+def fix_code(code: str): # basit syntax hatalarını otomatik düzelt
     lines = code.splitlines()
     fixed_lines = lines.copy()
     fixes = []
@@ -97,7 +100,7 @@ def fix_code(code: str):
             stripped.startswith(("def ", "if ", "elif ", "else", "for ", "while ", "class "))
             and not stripped.endswith(":")
         ):
-            fixed_lines[index] = line + ":"
+            fixed_lines[index] = line + ":" # eksik : varsa otomatik ekle
             fixes.append(f"{index + 1}. satıra ':' eklendi.")
 
         if stripped.count('"') % 2 != 0:
@@ -119,7 +122,7 @@ def fix_code(code: str):
     }
 
 
-def analyze_code(code: str):
+def analyze_code(code: str): # ana python kod analizi burada yapılıyor
     if not code.strip():
         return {
             "status": "error",
@@ -128,7 +131,8 @@ def analyze_code(code: str):
         }
 
     try:
-        tree = ast.parse(code)
+        tree = ast.parse(code) # ast parse başarısız olursa syntax error dönecek
+
 
         functions = []
         imports = []
@@ -139,12 +143,13 @@ def analyze_code(code: str):
         loop_count = 0
         if_count = 0
         risk_score = 0
-        max_depth = 0
+        max_depth = 0 # kod karmaşıklığını kabaca ölçmek için tutuluyor
 
-        secret_keywords = ["password", "api_key", "apikey", "secret", "token", "access_key"]
+        secret_keywords = ["password", "api_key", "apikey", "secret", "token", "access_key"] 
+        # olası gizli bilgi isimlerini kontrol ediyoruz
         hardcoded_secrets = []
 
-        risky_imports = {
+        risky_imports = { # bazı modüller sistem seviyesinde risk oluşturabilir
             "os": 2,
             "subprocess": 4,
             "pickle": 4,
@@ -152,7 +157,7 @@ def analyze_code(code: str):
             "shutil": 3
         }
 
-        risky_functions = {
+        risky_functions = { # tehlikeli olabilecek fonksiyonlar
             "eval": 5,
             "exec": 5,
             "compile": 4,
@@ -160,7 +165,7 @@ def analyze_code(code: str):
             "input": 1
         }
 
-        def calculate_depth(node, depth=0):
+        def calculate_depth(node, depth=0): # ast ağacındaki derinliği hesaplıyoruz
             nonlocal max_depth
             max_depth = max(max_depth, depth)
 
@@ -172,7 +177,7 @@ def analyze_code(code: str):
         comma_suggestions = detect_possible_missing_commas(code)
         suggestions.extend(comma_suggestions)
 
-        for node in ast.walk(tree):
+        for node in ast.walk(tree): # tüm syntax ağacını dolaş
             if isinstance(node, ast.FunctionDef):
                 functions.append(node.name)
 
@@ -180,7 +185,7 @@ def analyze_code(code: str):
                 loop_count += 1
 
                 if isinstance(node, ast.While):
-                    risk_score += 2
+                    risk_score += 2 # while döngülerini biraz daha riskli sayıyoruz
                     risk_warnings.append(
                         "while döngüsü dikkatli kullanılmalıdır; sonsuz döngü riski olabilir."
                     )
@@ -192,10 +197,7 @@ def analyze_code(code: str):
                 annotation = node.annotation
 
                 if isinstance(annotation, ast.Name):
-                    known_types = {
-                        "str", "int", "float", "bool",
-                        "list", "dict", "tuple", "set"
-                    }
+                    known_types = {"str", "int", "float", "bool","list", "dict", "tuple", "set"}
 
                     if annotation.id not in known_types:
                         suggestions.append(
@@ -208,16 +210,16 @@ def analyze_code(code: str):
                         variable_name = target.id.lower()
 
                         if any(keyword in variable_name for keyword in secret_keywords):
+                            # hardcoded şifre veya token kontrolü
                             if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
                                 hardcoded_secrets.append(target.id)
                                 risk_score += 4
-                                risk_warnings.append(
-                                    f"{target.id} değişkeninde hardcoded secret olabilir."
-                                )
+                                risk_warnings.append(f"{target.id} değişkeninde hardcoded secret olabilir.")
 
             elif isinstance(node, ast.Import):
                 for alias in node.names:
-                    imports.append(alias.name)
+                    imports.append(alias.name) # import edilen modülleri listeye ekle
+
 
             elif isinstance(node, ast.ImportFrom):
                 if node.module:
@@ -245,12 +247,8 @@ def analyze_code(code: str):
         line_count = len(code.splitlines())
         function_count = len(functions)
 
-        complexity_score = (
-            function_count
-            + (loop_count * 2)
-            + if_count
-            + max(0, max_depth - 8)
-        )
+        complexity_score = ( function_count + (loop_count * 2) + if_count+ max(0, max_depth - 8))
+        # karmaşıklık için basit skor hesabı yaptım 
 
         complexity_level = get_complexity_level(complexity_score)
         risk_level = get_risk_level(risk_score)
@@ -303,7 +301,7 @@ def analyze_code(code: str):
         if not suggestions:
             suggestions.append("Kod genel olarak sade görünüyor; okunabilirliği koruyarak geliştirmeye devam edilebilir.")
 
-        summary = ""
+        summary = "" # kullanıcıya kısa genel değerlendirme gösterilecek
 
         if risk_level == "high":
             summary += "Kod yüksek güvenlik riski içermektedir. "
@@ -348,7 +346,7 @@ def analyze_code(code: str):
             "suggestions": suggestions
         }
 
-    except SyntaxError as e:
+    except SyntaxError as e: # syntax parse aşamasında hata oluşursa
         return {
             "status": "error",
             "message": "Kodda syntax hatası var.",

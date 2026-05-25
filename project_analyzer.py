@@ -3,6 +3,16 @@ from analyzer import analyze_code
 from llm_service import get_llm_analysis
 
 
+# llm hata verirse tüm proje analizinin çökmesini engelleyecel
+def safe_llm_analysis(code, analysis):
+    try:
+        return get_llm_analysis(code, analysis)
+    except Exception as e:
+        print("LLM project analysis error:", e)
+        return "LLM analizi şu anda alınamadı."
+
+
+# dosyadan fonksiyon, class, import ve api bilgilerini çıkarıyoruz
 def extract_code_details(code):
     details = {
         "functions": [],
@@ -34,6 +44,7 @@ def extract_code_details(code):
                 if isinstance(node.func, ast.Attribute):
                     details["calls"].append(node.func.attr)
 
+                    # fastapi route tanımlarını yakalamaya çalışıyo
                     if node.func.attr in ["get", "post", "put", "delete", "patch"]:
                         if node.args and isinstance(node.args[0], ast.Constant):
                             details["api_routes"].append(
@@ -49,6 +60,7 @@ def extract_code_details(code):
     return details
 
 
+# dosyanın ne işe yaradığını kod yapısından tahmin ediyoruz
 def generate_file_purpose(filename, details):
     functions = details["functions"]
     classes = details["classes"]
@@ -104,6 +116,7 @@ def generate_file_purpose(filename, details):
     return " ".join(sentences)
 
 
+# proje içindeki dosyaların birbirine bağımlılığını çıkarıyoruz
 def build_dependency_graph(file_details):
     graph = {}
 
@@ -127,6 +140,7 @@ def build_dependency_graph(file_details):
     return graph
 
 
+# tüm proje dosyalarını tek tek analiz eden ana fonksiyon
 def analyze_project(files):
     file_reports = []
     file_details = {}
@@ -137,6 +151,7 @@ def analyze_project(files):
     most_complex_file = None
     highest_complexity_score = -1
 
+    # en karmaşık dosyayı bulmak için seviyelere basit skor verdim
     complexity_scores = {
         "low": 1,
         "medium": 2,
@@ -189,7 +204,8 @@ def analyze_project(files):
                 "classes": details["classes"],
                 "imports": details["imports"],
                 "api_routes": details["api_routes"],
-                "llm_analysis": get_llm_analysis(code, analysis),
+                # llm hata verse bile proje analizi devam etsin
+                "llm_analysis": safe_llm_analysis(code, analysis),
             })
 
         else:
@@ -209,7 +225,7 @@ def analyze_project(files):
     dependency_graph = build_dependency_graph(file_details)
 
     project_summary = (
-        f"Bu projede {len(files)} dosya analiz edildi. "
+        f"Bu projede {len(file_reports)} dosya analiz edildi. "
         f"Toplam {total_lines} satır kod ve {total_functions} fonksiyon tespit edildi. "
     )
 

@@ -11,9 +11,9 @@ from multi_language_analyzer import (analyze_cpp_code,analyze_javascript_code,
     analyze_java_code,analyze_go_code)
 
 app = FastAPI()
-agent = CodeAnalysisAgent()
+agent = CodeAnalysisAgent() # analiz işlemlerini yöneten ana agent
 
-app.add_middleware(
+app.add_middleware( # frontendden gelen istekler engellenmesin diye cors ayarı
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
@@ -26,25 +26,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class CodeRequest(BaseModel):
+class CodeRequest(BaseModel): # kod ve dil bilgisini frontendden bu modelle alıyoruz
     code: str
     language: str = "python"
 
 
 @app.get("/")
-def home():
-    return {"message": "Backend çalışıyor 🚀"}
+def home():   # backendin ayakta olup olmadığını hızlı kontrol ediyorum
+    return {"message": "Backend çalışıyor ✔︎ "} 
 
 
 @app.get("/health")
-def health_check():
+def health_check():  # sistem durumunu test etmek için basit health endpointi
     return {
         "status": "ok",
         "message": "Code analyzer backend aktif çalışıyor."
     }
 
 @app.post("/analyze")
-def analyze(request: CodeRequest):
+def analyze(request: CodeRequest):  # gelen dil bilgisine göre uygun analiz yolunu seçiyoruz
     print(
         f"Analyze endpoint çağrıldı | Dil: {request.language} | Kod uzunluğu: {len(request.code)} karakter"
     )
@@ -53,7 +53,7 @@ def analyze(request: CodeRequest):
 
     language = request.language.lower()
 
-    if language in ["cpp", "c++"]:
+    if language in ["cpp", "c++"]: # c++ için ayrı analyzer kullanılıyor
         result = analyze_cpp_code(request.code)
 
     elif language in ["javascript", "js"]:
@@ -65,22 +65,23 @@ def analyze(request: CodeRequest):
     elif language == "go":
         result = analyze_go_code(request.code)
 
-    else:
-        result = agent.process(request.code)
+    else:  # python tarafında ana agent üzerinden analiz yapılıyor
+        result = agent.process(request.code) 
 
     if result.get("status") == "success" and not result.get("llm_analysis"):
+          # analiz başarılıysa llm ile daha açıklayıcı yorum ekliyoruz
         try:
             result["llm_analysis"] = get_llm_analysis(
                 request.code,
                 result
             )
-        except Exception as e:
+        except Exception as e:  # llm hata verse bile ana analiz sonucu bozulmasın
             print("LLM Error:", e)
             result["llm_analysis"] = "LLM analizi şu anda çalışmıyor."
 
     return result
 @app.post("/fix")
-def fix(request: CodeRequest):
+def fix(request: CodeRequest):   # otomatik düzeltme endpointi
 
     print(
         f"Fix endpoint çağrıldı | Dil: {request.language} | Kod uzunluğu: {len(request.code)} karakter"
@@ -142,23 +143,23 @@ def fix(request: CodeRequest):
 
     return fix_code(request.code)
 
-@app.post("/analyze-project")
+@app.post("/analyze-project")  # çoklu python dosyası analizi için kullanılıyor
 async def analyze_project_files(files: list[UploadFile] = File(...)):
     uploaded_files = []
 
-    for file in files:
+    for file in files:  # şimdilik sadece python dosyalarını projeye dahil ediyoruz
         if not file.filename.endswith(".py"):
             continue
 
-        content = await file.read()
+        content = await file.read() # upload edilen dosyanın içeriğini okuyoruz
         code = content.decode("utf-8", errors="ignore")
 
-        uploaded_files.append({
+        uploaded_files.append({  # analyzerın beklediği formata çeviriyoruz
             "filename": file.filename,
             "content": code
         })
 
-    if not uploaded_files:
+    if not uploaded_files: # py dosyası yoksa analiz başlatmaya gerek yok
         return {
             "status": "error",
             "message": "Analiz edilecek Python dosyası bulunamadı."
