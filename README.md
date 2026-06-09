@@ -54,4 +54,3 @@ Gelecek Çalışmalar
 * CI/CD entegrasyonu
 * Daha kapsamlı güvenlik analizleri
 
-Ge
